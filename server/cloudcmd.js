@@ -28,10 +28,10 @@ const apart = require('apart');
 const ponse = require('ponse');
 const restafary = require('restafary');
 const restbox = require('restbox');
-const konsole = require('console-io');
-const edward = require('edward');
-const dword = require('dword');
-const deepword = require('deepword');
+// const konsole = require('console-io');
+// const edward = require('edward');
+// const dword = require('dword');
+// const deepword = require('deepword');
 const nomine = require('nomine');
 const fileop = require('@cloudcmd/fileop');
 
@@ -51,38 +51,38 @@ module.exports = (params) => {
     const config = p.configManager || createConfig({
         configPath,
     });
-    
+
     const {modules} = p;
-    
+
     const keys = Object.keys(options);
-    
+
     for (const name of keys) {
         let value = options[name];
-        
+
         if (/root/.test(name))
             validate.root(value, config);
-        
+
         if (/editor|packer|columns/.test(name))
             validate[name](value);
-        
+
         if (/prefix/.test(name))
             value = prefixer(value);
-        
+
         config(name, value);
     }
-    
+
     config('console', defaultValue(config, 'console', options));
     config('configDialog', defaultValue(config, 'configDialog', options));
-    
+
     const prefixSocket = prefixer(options.prefixSocket);
-    
+
     if (p.socket)
         listen({
             prefixSocket,
             config,
             socket: p.socket,
         });
-    
+
     return cloudcmd({
         modules,
         config,
@@ -97,10 +97,10 @@ module.exports._getIndexPath = getIndexPath;
 function defaultValue(config, name, options) {
     const value = options[name];
     const previous = config(name);
-    
+
     if (typeof value === 'undefined')
         return previous;
-    
+
     return value;
 }
 
@@ -108,7 +108,7 @@ module.exports._getPrefix = getPrefix;
 function getPrefix(prefix) {
     if (typeof prefix === 'function')
         return prefix() || '';
-    
+
     return prefix || '';
 }
 
@@ -116,61 +116,61 @@ module.exports._initAuth = _initAuth;
 function _initAuth(config, accept, reject, username, password) {
     if (!config('auth'))
         return accept();
-    
+
     const isName = username === config('username');
     const isPass = password === config('password');
-    
+
     if (isName && isPass)
         return accept();
-    
+
     reject();
 }
 
 function listen({prefixSocket, socket, config}) {
     const root = () => config('root');
     const auth = initAuth(config);
-    
+
     prefixSocket = getPrefix(prefixSocket);
-    
+
     if (config.listen)
         config.listen(socket, auth);
-    
+
     edward.listen(socket, {
         root,
         auth,
         prefixSocket: prefixSocket + '/edward',
     });
-    
+
     dword.listen(socket, {
         root,
         auth,
         prefixSocket: prefixSocket + '/dword',
     });
-    
+
     deepword.listen(socket, {
         root,
         auth,
         prefixSocket: prefixSocket + '/deepword',
     });
-    
-    config('console') && konsole.listen(socket, {
+
+    config('console') && require('console-io').listen(socket, {
         auth,
         prefixSocket: prefixSocket + '/console',
     });
-    
+
     fileop.listen(socket, {
         root,
         auth,
         prefix: prefixSocket + '/fileop',
     });
-    
+
     config('terminal') && terminal(config).listen(socket, {
         auth,
         prefix: prefixSocket + '/gritty',
         command: config('terminalCommand'),
         autoRestart: config('terminalAutoRestart'),
     });
-    
+
     distribute.export(config, socket);
 }
 
@@ -180,85 +180,85 @@ function cloudcmd({modules, config}) {
     const diff = apart(config, 'diff');
     const zip = apart(config, 'zip');
     const dir = DIR_ROOT;
-    
+
     const ponseStatic = ponse.static(dir, {cache});
-    
+
     const dropbox = config('dropbox');
     const dropboxToken = config('dropboxToken');
     const root = () => config('root');
-    
+
     const funcs = clean([
-        config('console') && konsole({
+        config('console') && require('console-io')({
             online,
         }),
-        
-        config('terminal') && terminal(config, {}),
-        
-        edward({
-            online,
-            diff,
-            zip,
-            dropbox,
-            dropboxToken,
-        }),
-        
-        dword({
+
+        config('terminal') && require('terminal')(config, {}),
+
+        config('editor') === edward && require('edward')({
             online,
             diff,
             zip,
             dropbox,
             dropboxToken,
         }),
-        
-        deepword({
+
+        config('editor') === dword && require('dword')({
             online,
             diff,
             zip,
             dropbox,
             dropboxToken,
         }),
-        
+
+        config('editor') === deepword && require('deepword')({
+            online,
+            diff,
+            zip,
+            dropbox,
+            dropboxToken,
+        }),
+
         fileop(),
         nomine(),
-        
+
         setUrl,
         setSW,
         logout,
         authentication(config),
         config.middle,
-        
+
         modules && modulas(modules),
-        
+
         config('dropbox') && restbox({
             prefix: cloudfunc.apiURL,
             root,
             token: dropboxToken,
         }),
-        
+
         restafary({
             prefix: cloudfunc.apiURL + '/fs',
             root,
         }),
-        
+
         userMenu({
             menuName: '.cloudcmd.menu.js',
         }),
-        
+
         rest(config),
         route(config, {
             html: defaultHtml,
         }),
-        
+
         ponseStatic,
     ]);
-    
+
     return funcs;
 }
 
 function logout(req, res, next) {
     if (req.url !== '/logout')
         return next();
-    
+
     res.sendStatus(401);
 }
 
@@ -266,26 +266,26 @@ module.exports._replaceDist = replaceDist;
 function replaceDist(url) {
     if (!isDev)
         return url;
-    
+
     return url.replace(/^\/dist\//, '/dist-dev/');
 }
 
 function setUrl(req, res, next) {
     if (/^\/cloudcmd\.js(\.map)?$/.test(req.url))
         req.url = `/dist${req.url}`;
-    
+
     req.url = replaceDist(req.url);
-    
+
     next();
 }
 
 function setSW(req, res, next) {
     const {url} = req;
     const isSW = /^\/sw\.js(\.map)?$/.test(url);
-    
+
     if (isSW)
         req.url = replaceDist(`/dist${url}`);
-    
+
     next();
 }
 
